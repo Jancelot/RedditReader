@@ -10,14 +10,9 @@ import java.util.ArrayList;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
 
 import android.net.Uri;
 import android.util.Log;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
 /**
  * class RedditFetcher
@@ -35,6 +30,8 @@ public class RedditFetcher {
 	private static final String PARAM_BEFORE = "before";
 	private static final String PARAM_COUNT = "count";
 	private static final String PARAM_LIMIT = "limit";  	//limit	the maximum number of items desired (default: 25, maximum: 100)
+	
+	private String mAfter;
 	
 	
 	/**
@@ -84,34 +81,27 @@ public class RedditFetcher {
 	 * 
 	 * fetch the recent photos from the REST endpoint
 	 */
-	public ArrayList<RedditLink> fetchItems() {
+	public ArrayList<RedditLink> fetchLinks() {
 		
-		Log.i(LOG_TAG, "fetchItems() called");
+		Log.i(LOG_TAG, "fetchLinks() called");
 		
 		ArrayList<RedditLink> links = new ArrayList<RedditLink>();
             		
 		try {
-			Log.i(LOG_TAG, "fetchItems() called 2");
-			
-			// TODO: retrieve "after" from fragment arguments
-			
 			// retrieve XML from endpoint
 			String url = Uri.parse(ENDPOINT).buildUpon()
-					//.appendQueryParameter(PARAM_AFTER, METHOD_GET_RECENT)
+					.appendQueryParameter(PARAM_AFTER, mAfter)
 					.build().toString();
-			Log.i(LOG_TAG, "url: " + url);
+			Log.i(LOG_TAG, "fetchLinks() url: " + url);
 			String jsonString = getUrl(url);
 
-			// TODO: need to store "after" in fragment arguments
+			// update "after" value so the the fragment can store if desired
 			JSONObject data = new JSONObject(jsonString).getJSONObject("data");
-			
-			RedditListing listing = new RedditListing();
-			listing.setAfter(data.optString("after"));
-			Log.i(LOG_TAG, "after: " + listing.toString());
+			setAfter(data.optString("after"));
 			
 			// cycle through children
 			JSONArray children = data.getJSONArray("children");
-			Log.i(LOG_TAG, "children: " + children.length());
+			Log.i(LOG_TAG, "fetchLinks() children: " + children.length());
 			
 			for (int i=0; i < children.length(); i++) {
 				JSONObject child = children.getJSONObject(i).getJSONObject("data");
@@ -126,6 +116,7 @@ public class RedditFetcher {
 				link.setIs_self(child.optBoolean("is_self"));
 				link.setLink_flair_css_class(child.optString("link_flair_css_class"));
 				link.setLink_flair_text(child.optString("link_flair_text"));
+				link.setNum_comments(child.optInt("num_comments"));
 				link.setOver_18(child.optBoolean("over_18"));
 				link.setPermalink(child.optString("permalink"));
 				link.setSaved(child.optBoolean("saved"));
@@ -142,6 +133,8 @@ public class RedditFetcher {
 				
 				links.add(link);
 			}
+			Log.i(LOG_TAG, "fetchLinks() first: " + links.get(0).getTitle());
+			Log.i(LOG_TAG, "fetchLinks() last: " + links.get(children.length()-1).getTitle());
 			
 		} catch (IOException ioe) {
 			Log.e(LOG_TAG, "Failed to fetch items", ioe);
@@ -152,6 +145,19 @@ public class RedditFetcher {
 		}
 	    
 		return links;
+	}
+
+	
+	/**
+	 * GETTERS AND SETTERS
+	 * 
+	 */
+	public String getAfter() {
+		return mAfter;
+	}
+	
+	public void setAfter(String after) {
+		mAfter = after;
 	}
 	
 }

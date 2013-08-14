@@ -9,45 +9,133 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.app.ListFragment;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import com.handmark.pulltorefresh.library.PullToRefreshBase;
+import com.handmark.pulltorefresh.library.PullToRefreshBase.Mode;
+import com.handmark.pulltorefresh.library.PullToRefreshBase.OnRefreshListener;
+import com.handmark.pulltorefresh.library.PullToRefreshBase.OnRefreshListener2;
+import com.handmark.pulltorefresh.library.PullToRefreshListView;
 
 /**
  * @author chris
+ * 
+ * Pull To Refresh Functionality: https://github.com/chrisbanes/Android-PullToRefresh
  *
  */
-public class RedditListFragment extends ListFragment {
-
+public class RedditListFragment extends ListFragment implements OnRefreshListener<ListView> {
+	
 	private static final String LOG_TAG = "RedditListFragment";
 	
-	private FetchItemsTask fetchTask = new FetchItemsTask();
+	private FetchItemsTask mFetchTask = new FetchItemsTask();
 	private ArrayList<RedditLink> mLinks;
+	
+	private PullToRefreshListView mPullToRefreshListView;
+	
+	private static final String EXTRA_AFTER = "com.jantze.redditreader.after";
+	private String mAfter;
 	
 	
 	/**
 	 * onCreate
-	 */
+`	 */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		Log.i(LOG_TAG, "onCreate() called");
 		
+		if (savedInstanceState != null) {
+			mAfter = savedInstanceState.getString(EXTRA_AFTER);
+		}
+		
 		setRetainInstance(true);
 		
-		fetchTask.execute();
+		new FetchItemsTask().execute();
 		
-		setupAdapter();
+		setupAdapter();		
+	}
+	
+	/**
+	 * onCreateView
+	 * 
+	 * (non-Javadoc)
+	 * @see android.support.v4.app.ListFragment#onCreateView(android.view.LayoutInflater, android.view.ViewGroup, android.os.Bundle)
+	 */
+	@Override
+	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+		View layout =  super.onCreateView(inflater, container, savedInstanceState);
+		
+		ListView lv = (ListView) layout.findViewById(android.R.id.list);
+        ViewGroup parent = (ViewGroup) lv.getParent();
+
+        // Remove ListView and add PullToRefreshListView in its place
+		int lvIndex = parent.indexOfChild(lv);
+		parent.removeViewAt(lvIndex);
+
+		mPullToRefreshListView = new PullToRefreshListView(layout.getContext());
+        mPullToRefreshListView.setMode(Mode.BOTH);
+        mPullToRefreshListView.setOnRefreshListener(new OnRefreshListener2<ListView>(){
+            @Override
+            public void onPullDownToRefresh(PullToRefreshBase<ListView> refreshView) {
+            	// top, fetch newer items if any
+                (new Handler()).postDelayed(new Runnable() {                	
+                    @Override
+                    public void run() {
+                        Toast.makeText(getActivity(),
+                                "Don't pull down the list! Pull up instead.",
+                                Toast.LENGTH_LONG).show();
+                        mPullToRefreshListView.onRefreshComplete();
+                    }
+                }, 1000);
+            }
+            @Override
+            public void onPullUpToRefresh(PullToRefreshBase<ListView> refreshView) {            	
+            	// bottom, fetch older items
+            	new FetchItemsTask().execute();
+            	mPullToRefreshListView.onRefreshComplete();
+            }
+        });
+
+        parent.addView(mPullToRefreshListView, lvIndex, lv.getLayoutParams());
+        
+		return layout;
+	}
+
+	/**
+	 * onRefresh
+	 */
+	@Override
+	public void onRefresh(PullToRefreshBase<ListView> refreshView) {
+		Log.i(LOG_TAG, "*********   onRefresh() called   ***********");
+		// Do work to refresh the list here.
+		new FetchItemsTask().execute();
+	}
+	
+	/**
+	 * onSaveInstanceState
+	 * 
+	 * (non-Javadoc)
+	 * @see android.support.v4.app.Fragment#onSaveInstanceState(android.os.Bundle)
+	 */
+	@Override
+	public void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		outState.putString(EXTRA_AFTER, mAfter);
 	}
 
 	/**
@@ -55,7 +143,6 @@ public class RedditListFragment extends ListFragment {
 	 * 
 	 */
 	void setupAdapter() {
-		Log.i(LOG_TAG, "setupAdapter() called");
 		if (getActivity() == null) {
 			return;
 		}
@@ -116,8 +203,30 @@ public class RedditListFragment extends ListFragment {
 			
 			RedditLink link = getItem(position);
 			
+			TextView scoreTextView = (TextView)convertView.findViewById(R.id.reddit_list_item_score);
+			scoreTextView.setText(Integer.toString(link.getScore()));
+			
 			TextView titleTextView = (TextView)convertView.findViewById(R.id.reddit_list_item_title);
 			titleTextView.setText(link.getTitle());
+			
+			int count = link.getNum_comments();
+			Resources res = getResources();
+			String commentsMade = res.getQuantityString(R.plurals.number_of_comments, count, count);			
+			TextView commentsTextView = (TextView)convertView.findViewById(R.id.reddit_list_item_comments);
+			commentsTextView.setText(commentsMade);
+		
+			String thumbnailUrl = link.getThumbnail();
+			
+			if (thumbnailUrl.isEmpty() || 
+					thumbnailUrl == null || 				
+					thumbnailUrl.equals("self")) {
+				// do nothing, these cause DrawableManger to fatal
+				//Log.i(LOG_TAG, "getView()  doing nothing!: " + thumbnailUrl);
+			} else {
+				//Log.i(LOG_TAG, "getView()  fetching thumbnail: " + thumbnailUrl);
+				ImageView thumbnailImageView = (ImageView)convertView.findViewById(R.id.reddit_list_item_thumbnail);
+				new DrawableManager().fetchDrawableOnThread(thumbnailUrl, thumbnailImageView);
+			}
 			
 			// TODO: network task needs to be on a thread
 			/*
@@ -169,8 +278,13 @@ public class RedditListFragment extends ListFragment {
 		 * @see android.os.AsyncTask#onPostExecute(java.lang.Object)
 		 */
 		@Override
-		protected void onPostExecute(ArrayList<RedditLink> links) {
-			mLinks = links;
+		protected void onPostExecute(ArrayList<RedditLink> links) {			
+			// append new links to existing
+			if (mLinks == null) {
+				mLinks = links;
+			} else {
+				mLinks.addAll(links);
+			}
 			setupAdapter();
 		}
 
@@ -182,8 +296,18 @@ public class RedditListFragment extends ListFragment {
 		 */
 		@Override
 		protected ArrayList<RedditLink> doInBackground(Void... params) {
-			// fetch the links from Reddit
-			return new RedditFetcher().fetchItems();
+
+			// instantiate RedditFetcher and set the "after" value
+			RedditFetcher fetcher = new RedditFetcher();
+			fetcher.setAfter(mAfter);
+			// fetch items
+			ArrayList<RedditLink> links = fetcher.fetchLinks();
+			
+			// retrieve new "after" value and update fragment arguments
+			Log.i(LOG_TAG, "doInBackground after1: " + mAfter + "   after2: " + fetcher.getAfter());
+			mAfter = fetcher.getAfter();
+			
+			return links;
 		}
 		
 	}
