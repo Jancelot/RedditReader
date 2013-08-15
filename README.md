@@ -2,7 +2,7 @@ RedditReader
 ============
 ## APK:
 ------------
-abc
+http://thejantzes.com/files/RedditReader.apk
 
 ## Git Repo:  
 ----------------
