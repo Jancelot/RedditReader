@@ -11,28 +11,56 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.content.Context;
 import android.net.Uri;
 import android.util.Log;
+
 
 /**
  * class RedditFetcher
  * 
  * @author chris
  *
+ * Singleton 
+ * 
  */
 public class RedditFetcher {
 
 	private static final String LOG_TAG = "RedditFetcher";
-	
+
 	private static final String ENDPOINT = "http://www.reddit.com/.json";	
-	
 	private static final String PARAM_AFTER = "after";
-	private static final String PARAM_BEFORE = "before";
-	private static final String PARAM_COUNT = "count";
-	private static final String PARAM_LIMIT = "limit";  	//limit	the maximum number of items desired (default: 25, maximum: 100)
+
+	private static RedditFetcher sRedditFetcher;
+	private Context mAppContext;
 	
 	private String mAfter;
 	
+	private ArrayList<RedditLink> mLinks;
+	
+	
+	/**
+	 * constructor
+	 * 
+	 * @param appContext
+	 */
+	private RedditFetcher(Context appContext) {
+		mAppContext = appContext;
+		mLinks = new ArrayList<RedditLink>();
+	}
+	
+	/**
+	 * get
+	 * 
+	 * @param c
+	 * @return
+	 */
+	public static RedditFetcher get(Context c) {
+		if (sRedditFetcher == null) {
+			sRedditFetcher = new RedditFetcher(c.getApplicationContext());
+		}
+		return sRedditFetcher;
+	}
 	
 	/**
 	 * getUrlBytes
@@ -83,8 +111,6 @@ public class RedditFetcher {
 	 */
 	public ArrayList<RedditLink> fetchLinks() {
 		
-		Log.i(LOG_TAG, "fetchLinks() called");
-		
 		ArrayList<RedditLink> links = new ArrayList<RedditLink>();
             		
 		try {
@@ -92,7 +118,6 @@ public class RedditFetcher {
 			String url = Uri.parse(ENDPOINT).buildUpon()
 					.appendQueryParameter(PARAM_AFTER, mAfter)
 					.build().toString();
-			Log.i(LOG_TAG, "fetchLinks() url: " + url);
 			String jsonString = getUrl(url);
 
 			// update "after" value so the the fragment can store if desired
@@ -101,7 +126,6 @@ public class RedditFetcher {
 			
 			// cycle through children
 			JSONArray children = data.getJSONArray("children");
-			Log.i(LOG_TAG, "fetchLinks() children: " + children.length());
 			
 			for (int i=0; i < children.length(); i++) {
 				JSONObject child = children.getJSONObject(i).getJSONObject("data");
@@ -133,8 +157,12 @@ public class RedditFetcher {
 				
 				links.add(link);
 			}
-			Log.i(LOG_TAG, "fetchLinks() first: " + links.get(0).getTitle());
-			Log.i(LOG_TAG, "fetchLinks() last: " + links.get(children.length()-1).getTitle());
+			
+			if (mLinks == null) {
+				mLinks = links;
+			} else {
+				mLinks.addAll(links);
+			}
 			
 		} catch (IOException ioe) {
 			Log.e(LOG_TAG, "Failed to fetch items", ioe);
@@ -147,6 +175,28 @@ public class RedditFetcher {
 		return links;
 	}
 
+	/**
+	 * getLinks
+	 * 
+	 * @return
+	 */
+	public ArrayList<RedditLink> getLinks() {
+		return mLinks;
+	}
+	
+	/**
+	 * getLink
+	 * 
+	 * @param position
+	 * @return
+	 */
+	public RedditLink getLink(int position) {
+		try {
+			return mLinks.get(position);
+		} catch ( IndexOutOfBoundsException e ) {			
+		    return null;
+		}		
+	}
 	
 	/**
 	 * GETTERS AND SETTERS

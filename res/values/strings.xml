@@ -5,5 +5,7 @@
     <string name="list_item_title_default">title</string>
     <string name="list_item_comments_default">comments</string>
     <string name="list_item_score_default">score</string>
+    <string name="list_item_more_button">More</string>
+    <string name="list_item_less_button">Less</string>
     
 </resources>

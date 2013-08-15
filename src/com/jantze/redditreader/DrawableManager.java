@@ -103,7 +103,7 @@ public class DrawableManager {
     }
 
     private InputStream fetch(String urlString) throws MalformedURLException, IOException {
-    	Log.i(TAG, "fetch()  urlString: " + urlString);
+    	Log.d(TAG, "fetch()  urlString: " + urlString);
         DefaultHttpClient httpClient = new DefaultHttpClient();
         HttpGet request = new HttpGet(urlString);
         HttpResponse response = httpClient.execute(request);

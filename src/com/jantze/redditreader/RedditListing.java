@@ -12,7 +12,6 @@
 
 package com.jantze.redditreader;
 
-import java.util.ArrayList;
 
 //https://github.com/reddit/reddit/wiki/JSON
 public class RedditListing {
@@ -20,8 +19,6 @@ public class RedditListing {
 	private String mBefore;
 	private String mAfter;
 	private String mModhash;
-	
-	private ArrayList<RedditLink> links;
 	
 	
 	@Override
